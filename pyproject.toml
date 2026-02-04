@@ -1,0 +1,88 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "triton-inference-kernels"
+version = "0.1.0"
+description = "GPU inference kernels in OpenAI Triton — fused softmax and Flash Attention with operation fusion and memory coalescing"
+readme = "README.md"
+license = { text = "MIT" }
+authors = [{ name = "Rajath John", email = "jrajath94@gmail.com" }]
+requires-python = ">=3.10"
+keywords = [
+    "triton",
+    "gpu",
+    "inference",
+    "flash-attention",
+    "softmax",
+    "llm",
+    "cuda",
+    "machine-learning",
+    "deep-learning",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+    "torch>=2.0.0",
+    "triton>=2.1.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4",
+    "pytest-cov>=4.1",
+    "ruff>=0.1.0",
+    "mypy>=1.5",
+]
+bench = [
+    "tabulate>=0.9.0",
+    "pandas>=2.0",
+]
+
+[project.scripts]
+triton-kernels = "triton_kernels.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/jrajath94/triton-inference-kernels"
+Repository = "https://github.com/jrajath94/triton-inference-kernels"
+Issues = "https://github.com/jrajath94/triton-inference-kernels/issues"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+select = ["E", "F", "W", "I", "N", "UP"]
+ignore = ["E501"]
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-v --tb=short"
+markers = [
+    "gpu: marks tests that require a CUDA GPU",
+    "slow: marks tests that are slow",
+]
+
+[tool.coverage.run]
+source = ["triton_kernels"]
+omit = ["tests/*", "benchmarks/*", "examples/*"]
+
+[tool.coverage.report]
+show_missing = true
+fail_under = 75
