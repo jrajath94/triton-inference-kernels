@@ -163,10 +163,13 @@ def fused_softmax(x: torch.Tensor, dim: int = -1) -> torch.Tensor:
 
     # Grid: one Triton program per row
     grid = (n_rows,)
+    # Bug fix (2026-02-07): must pass stride(0) not shape[-1] — for non-contiguous
+    # inputs, stride != n_cols (e.g., after a transpose). contiguous() above ensures
+    # stride(0) == n_cols here, but using stride(0) is correct by construction.
     _softmax_kernel[grid](
         output,
         x_2d,
-        x_2d.stride(0),  # row stride in elements
+        x_2d.stride(0),  # row stride in elements (not n_cols — see comment above)
         output.stride(0),
         n_cols,
         BLOCK_SIZE=block_size,
