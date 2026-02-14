@@ -184,10 +184,10 @@ def _flash_attention_fwd_kernel(
         l_i = l_i * alpha + tl.sum(tl.exp(qk - m_new[:, None]), axis=1)
         acc = acc * alpha[:, None] + tl.dot(tl.exp(qk - m_new[:, None]).to(v.dtype), v)
 
-        # Update running max
+        # Update running max for next iteration
         m_i = m_new
 
-        # Advance block pointers to next K,V tile
+        # Advance block pointers to next K,V tile (O(BLOCK_DHEAD × BLOCK_N) per step)
         K_block_ptr = tl.advance(K_block_ptr, (0, BLOCK_N))
         V_block_ptr = tl.advance(V_block_ptr, (BLOCK_N, 0))
 
