@@ -165,11 +165,13 @@ def _flash_attention_fwd_kernel(
         # This is the attention score matrix tile
         qk = tl.dot(q, k) * sm_scale
 
-        # Causal masking: zero out future positions by setting to -inf
-        # Avoids branch for non-causal (IS_CAUSAL=False compiles it out)
+        # Causal masking: zero out future positions by setting to -inf before softmax.
+        # IS_CAUSAL is a compile-time constexpr — Triton elides the entire block
+        # at compile time for IS_CAUSAL=False, so there's zero runtime overhead.
         if IS_CAUSAL:
             offs_n = start_n + tl.arange(0, BLOCK_N)
             # mask[i, j] = True when query position i can attend to key position j
+            # (causal: i >= j, i.e., only past and present tokens)
             causal_mask = offs_m[:, None] >= offs_n[None, :]
             qk = tl.where(causal_mask, qk, float("-inf"))
 
