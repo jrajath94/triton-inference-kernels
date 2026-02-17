@@ -162,7 +162,10 @@ def _flash_attention_fwd_kernel(
         v = tl.load(V_block_ptr)
 
         # QK^T: (BLOCK_M, BLOCK_DHEAD) @ (BLOCK_DHEAD, BLOCK_N) → (BLOCK_M, BLOCK_N)
-        # This is the attention score matrix tile
+        # Apply sm_scale here (before exp) to keep values in a numerically safe range.
+        # fp16 max is ~65504 — without scaling, qk values can reach 60+ for
+        # misaligned Q,K pairs, causing exp() to overflow at long sequences.
+        # Fix (2026-02-16): sm_scale * before * exp, not after.
         qk = tl.dot(q, k) * sm_scale
 
         # Causal masking: zero out future positions by setting to -inf before softmax.
