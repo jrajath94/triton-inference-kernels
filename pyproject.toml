@@ -1,6 +1,6 @@
 [build-system]
 requires = ["setuptools>=68", "wheel"]
-build-backend = "setuptools.backends.legacy:build"
+build-backend = "setuptools.build_meta"
 
 [project]
 name = "triton-inference-kernels"
@@ -9,7 +9,7 @@ description = "GPU inference kernels in OpenAI Triton — fused softmax and Flas
 readme = "README.md"
 license = { text = "MIT" }
 authors = [{ name = "Rajath John", email = "jrajath94@gmail.com" }]
-requires-python = ">=3.10"
+requires-python = ">=3.9"
 keywords = [
     "triton",
     "gpu",
@@ -33,10 +33,12 @@ classifiers = [
 ]
 dependencies = [
     "torch>=2.0.0",
-    "triton>=2.1.0",
 ]
 
 [project.optional-dependencies]
+triton = [
+    "triton>=2.1.0",
+]
 dev = [
     "pytest>=7.4",
     "pytest-cov>=4.1",

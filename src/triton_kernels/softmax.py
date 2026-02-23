@@ -35,80 +35,96 @@ import logging
 from typing import Optional
 
 import torch
-import triton
-import triton.language as tl
 
 from triton_kernels.utils import select_block_size
 
+# Triton is an optional runtime dependency — only available on Linux + CUDA GPU.
+# We import lazily so the module can be imported on CPU-only machines for
+# testing utilities (naive_softmax, utils, etc.) without crashing.
+try:
+    import triton
+    import triton.language as tl
+    _TRITON_AVAILABLE = True
+except ImportError:
+    triton = None  # type: ignore[assignment]
+    tl = None  # type: ignore[assignment]
+    _TRITON_AVAILABLE = False
+
 logger = logging.getLogger(__name__)
 
-# Autotune config: Triton will benchmark these and pick the fastest.
-# BLOCK_SIZE must be a power of 2. num_warps controls thread organization.
-_SOFTMAX_CONFIGS = [
-    triton.Config({"BLOCK_SIZE": 256}, num_warps=4),
-    triton.Config({"BLOCK_SIZE": 512}, num_warps=8),
-    triton.Config({"BLOCK_SIZE": 1024}, num_warps=16),
-    triton.Config({"BLOCK_SIZE": 2048}, num_warps=32),
-]
+# Kernel definitions are only available when Triton is installed.
+# On CPU-only machines, the fused_softmax wrapper falls back to torch.softmax.
+if _TRITON_AVAILABLE:
+    # Autotune config: Triton will benchmark these and pick the fastest.
+    # BLOCK_SIZE must be a power of 2. num_warps controls thread organization.
+    _SOFTMAX_CONFIGS = [
+        triton.Config({"BLOCK_SIZE": 256}, num_warps=4),
+        triton.Config({"BLOCK_SIZE": 512}, num_warps=8),
+        triton.Config({"BLOCK_SIZE": 1024}, num_warps=16),
+        triton.Config({"BLOCK_SIZE": 2048}, num_warps=32),
+    ]
 
+    @triton.jit
+    def _softmax_kernel(  # type: ignore[no-redef]
+        output_ptr,
+        input_ptr,
+        input_row_stride,
+        output_row_stride,
+        n_cols,
+        BLOCK_SIZE: tl.constexpr,
+    ) -> None:
+        """Fused single-pass softmax kernel.
 
-@triton.jit
-def _softmax_kernel(
-    output_ptr,
-    input_ptr,
-    input_row_stride,
-    output_row_stride,
-    n_cols,
-    BLOCK_SIZE: tl.constexpr,
-) -> None:
-    """Fused single-pass softmax kernel.
+        Grid: (n_rows,). Each program instance handles exactly one row.
 
-    Grid: (n_rows,). Each program instance handles exactly one row.
+        Memory layout:
+            input[row, :n_cols]  → load into registers (one vectorized load)
+            output[row, :n_cols] → write after normalization (one vectorized store)
 
-    Memory layout:
-        input[row, :n_cols]  → load into registers (one vectorized load)
-        output[row, :n_cols] → write after normalization (one vectorized store)
+        For rows wider than BLOCK_SIZE (unusual in practice), the outer Python
+        wrapper chunks the work. Within this kernel, we assume n_cols <= BLOCK_SIZE
+        and use masking for the tail elements.
 
-    For rows wider than BLOCK_SIZE (unusual in practice), the outer Python
-    wrapper chunks the work. Within this kernel, we assume n_cols <= BLOCK_SIZE
-    and use masking for the tail elements.
+        Args (Triton JIT — not standard Python):
+            output_ptr: Pointer to output buffer (n_rows × n_cols, contiguous).
+            input_ptr:  Pointer to input buffer (n_rows × n_cols, contiguous).
+            input_row_stride:  Stride in elements between consecutive rows of input.
+            output_row_stride: Stride in elements between consecutive rows of output.
+            n_cols: Number of valid columns (may be < BLOCK_SIZE).
+            BLOCK_SIZE: Compile-time constant, power of 2 >= n_cols.
+        """
+        # Each program handles row `row_idx`
+        row_idx = tl.program_id(0)
+        row_start_ptr = input_ptr + row_idx * input_row_stride
 
-    Args (Triton JIT — not standard Python):
-        output_ptr: Pointer to output buffer (n_rows × n_cols, contiguous).
-        input_ptr:  Pointer to input buffer (n_rows × n_cols, contiguous).
-        input_row_stride:  Stride in elements between consecutive rows of input.
-        output_row_stride: Stride in elements between consecutive rows of output.
-        n_cols: Number of valid columns (may be < BLOCK_SIZE).
-        BLOCK_SIZE: Compile-time constant, power of 2 >= n_cols.
-    """
-    # Each program handles row `row_idx`
-    row_idx = tl.program_id(0)
-    row_start_ptr = input_ptr + row_idx * input_row_stride
+        # Build column index vector [0, 1, ..., BLOCK_SIZE-1]
+        col_offsets = tl.arange(0, BLOCK_SIZE)
+        input_ptrs = row_start_ptr + col_offsets
 
-    # Build column index vector [0, 1, ..., BLOCK_SIZE-1]
-    col_offsets = tl.arange(0, BLOCK_SIZE)
-    input_ptrs = row_start_ptr + col_offsets
+        # Masked load: columns >= n_cols are filled with -inf so max/sum ignore them
+        mask = col_offsets < n_cols
+        row = tl.load(input_ptrs, mask=mask, other=-float("inf"))
 
-    # Masked load: columns >= n_cols are filled with -inf so max/sum ignore them
-    mask = col_offsets < n_cols
-    row = tl.load(input_ptrs, mask=mask, other=-float("inf"))
+        # --- Single-pass numerically stable softmax ---
+        # Step 1: subtract max (prevents exp overflow for large inputs)
+        row_max = tl.max(row, axis=0)
+        row_minus_max = row - row_max
 
-    # --- Single-pass numerically stable softmax ---
-    # Step 1: subtract max (prevents exp overflow for large inputs)
-    row_max = tl.max(row, axis=0)
-    row_minus_max = row - row_max
+        # Step 2: exponentiate and sum
+        numerator = tl.exp(row_minus_max)
+        denominator = tl.sum(numerator, axis=0)
 
-    # Step 2: exponentiate and sum
-    numerator = tl.exp(row_minus_max)
-    denominator = tl.sum(numerator, axis=0)
+        # Step 3: normalize
+        softmax_output = numerator / denominator
 
-    # Step 3: normalize
-    softmax_output = numerator / denominator
+        # Write back only valid columns
+        output_row_start_ptr = output_ptr + row_idx * output_row_stride
+        output_ptrs = output_row_start_ptr + col_offsets
+        tl.store(output_ptrs, softmax_output, mask=mask)
 
-    # Write back only valid columns
-    output_row_start_ptr = output_ptr + row_idx * output_row_stride
-    output_ptrs = output_row_start_ptr + col_offsets
-    tl.store(output_ptrs, softmax_output, mask=mask)
+else:
+    _SOFTMAX_CONFIGS = []
+    _softmax_kernel = None  # type: ignore[assignment]
 
 
 def fused_softmax(x: torch.Tensor, dim: int = -1) -> torch.Tensor:
@@ -146,11 +162,14 @@ def fused_softmax(x: torch.Tensor, dim: int = -1) -> torch.Tensor:
         raise ValueError(
             f"fused_softmax currently supports dim=-1 only, got dim={dim} for {x.ndim}D tensor"
         )
-    if not x.is_cuda:
-        logger.warning(
-            "fused_softmax called on CPU tensor — falling back to torch.softmax. "
-            "For GPU speedups, move tensor to CUDA first."
-        )
+    if not _TRITON_AVAILABLE or not x.is_cuda:
+        if not _TRITON_AVAILABLE:
+            logger.debug("Triton not installed — falling back to torch.softmax.")
+        else:
+            logger.warning(
+                "fused_softmax called on CPU tensor — falling back to torch.softmax. "
+                "For GPU speedups, move tensor to CUDA first."
+            )
         return torch.softmax(x, dim=-1)
 
     # Flatten to 2D: (n_rows, n_cols). We restore shape at the end.
