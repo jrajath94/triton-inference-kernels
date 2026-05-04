@@ -45,7 +45,6 @@ DRAM access: O(seq_len × head_dim) instead of O(seq_len^2)
 
 import logging
 import math
-from typing import Optional
 
 import torch
 
@@ -230,7 +229,7 @@ def flash_attention(
     k: torch.Tensor,
     v: torch.Tensor,
     causal: bool = False,
-    sm_scale: Optional[float] = None,
+    sm_scale: float | None = None,
     block_m: int = DEFAULT_BLOCK_M,
     block_n: int = DEFAULT_BLOCK_N,
 ) -> torch.Tensor:
@@ -356,7 +355,7 @@ def _sdpa_fallback(
     k: torch.Tensor,
     v: torch.Tensor,
     causal: bool = False,
-    sm_scale: Optional[float] = None,
+    sm_scale: float | None = None,
 ) -> torch.Tensor:
     """CPU/non-CUDA fallback using PyTorch's scaled_dot_product_attention.
 

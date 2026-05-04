@@ -8,7 +8,6 @@ The naive implementations here serve two purposes:
 
 import logging
 import math
-from typing import Optional
 
 import torch
 
@@ -97,7 +96,7 @@ def naive_attention(
     k: torch.Tensor,
     v: torch.Tensor,
     causal: bool = False,
-    sm_scale: Optional[float] = None,
+    sm_scale: float | None = None,
 ) -> torch.Tensor:
     """Standard scaled dot-product attention in PyTorch (O(N^2) memory).
 

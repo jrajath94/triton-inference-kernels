@@ -32,7 +32,6 @@ typical seq_len <= 4096), so we use the simpler subtract-max approach.
 """
 
 import logging
-from typing import Optional
 
 import torch
 
@@ -281,7 +280,7 @@ class FusedSoftmaxFunction(torch.autograd.Function):
     def backward(
         ctx: torch.autograd.function.FunctionCtx,
         output_grad: torch.Tensor,
-    ) -> Optional[torch.Tensor]:
+    ) -> torch.Tensor | None:
         """Backward pass: compute gradient using saved softmax probabilities.
 
         Args:

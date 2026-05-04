@@ -10,7 +10,6 @@ Usage:
 import argparse
 import logging
 import sys
-from typing import Optional
 
 import torch
 
@@ -224,7 +223,7 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def main(argv: Optional[list[str]] = None) -> None:
+def main(argv: list[str] | None = None) -> None:
     """Entry point for the triton-kernels CLI.
 
     Args:

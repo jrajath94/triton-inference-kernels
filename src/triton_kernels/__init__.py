@@ -11,8 +11,8 @@ Note: Triton GPU kernels require `triton>=2.1.0` and a CUDA-capable GPU.
 On CPU-only machines, all functions gracefully fall back to PyTorch equivalents.
 """
 
-from triton_kernels.softmax import fused_softmax  # noqa: F401
 from triton_kernels.attention import flash_attention  # noqa: F401
+from triton_kernels.softmax import fused_softmax  # noqa: F401
 
 __version__ = "0.1.0"
 __author__ = "Rajath John"
