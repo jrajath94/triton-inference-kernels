@@ -9,7 +9,6 @@ At seq_len=2048: 50x less VRAM than naive attention, 1.67x faster than PyTorch S
 All in ~300 lines of Python-ish code you can actually read.
 
 Code: github.com/jrajath94/triton-inference-kernels
-🧵
 
 ---
 
