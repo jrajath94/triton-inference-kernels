@@ -15,7 +15,7 @@ The goal: if you want to understand *why* flash attention uses 50x less memory t
 
 ## Why Triton Over CUDA?
 
-CUDA gives maximum control but requires C++ and manual PTX. Triton gives 85-95% of CUDA performance with Python-level ergonomics, because it exposes the key abstractions — tiling, memory coalescing, blocked loads — without exposing the full ISA. For inference engineering teams, this means faster kernel iteration on non-standard architectures.
+CUDA gives maximum control but requires C++ and manual PTX. Triton provides Python-level ergonomics, exposing key abstractions — tiling, memory coalescing, blocked loads — without the full ISA. For inference engineering teams, this enables faster kernel iteration on non-standard architectures.
 
 ## Key Implementation Details
 
@@ -120,7 +120,7 @@ make lint    # Ruff + mypy
 
 | Decision | Rationale | Alternative Considered |
 |----------|-----------|----------------------|
-| Triton over CUDA C++ | Python ergonomics; same tiling abstractions; 10x faster iteration | Raw CUDA (would give 5-10% more throughput) |
+| Triton over CUDA C++ | Python ergonomics; same tiling abstractions | Raw CUDA |
 | Online softmax (Milakov 2018) | Single-pass; enables tiling without storing full N×N matrix | Two-pass (requires reading full sequence twice) |
 | `tl.make_block_ptr` API | Auto-handles bounds, coalesced loads, cleaner code | Manual pointer arithmetic (Triton <2.1 style) |
 | Inference-only (no backward) | Scope clarity; backward adds significant complexity | Full autograd (future work) |
