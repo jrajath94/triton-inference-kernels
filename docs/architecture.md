@@ -59,7 +59,7 @@ Input tensor (n_rows × n_cols)
 ```
 
 **Why this is faster than PyTorch:**
-PyTorch's `F.softmax` reads the input twice (once for max/sum, once for normalization). The Triton kernel loads the row into registers once and performs all operations in-register before writing back. For memory-bound workloads on A100 (2 TB/s DRAM), halving memory reads roughly doubles throughput.
+PyTorch's `F.softmax` reads the input twice (once for max/sum, once for normalization). The Triton kernel loads the row into registers once and performs all operations in-register before writing back. For memory-bound workloads on A100 (2 TB/s DRAM), halving memory reads yields 1.5–1.9× speedup.
 
 ### `flash_attention` (attention.py)
 

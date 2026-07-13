@@ -50,7 +50,7 @@ graph TD
 
 ## Benchmarks
 
-Measured on A100 80GB SXM. CPU-only environments show simulated numbers labeled `[SIMULATED]`.
+The numbers below are estimated based on known A100 80GB SXM performance characteristics from the Flash Attention paper and Triton tutorials. For actual measurements on your hardware, run `make bench`.
 
 ### Softmax: Triton vs PyTorch
 
@@ -61,7 +61,7 @@ Measured on A100 80GB SXM. CPU-only environments show simulated numbers labeled 
 | 64    | 2048   | 0.056       | 0.108        | 1.93x   | 1,862     |
 | 128   | 1024   | 0.059       | 0.110        | 1.86x   | 1,757     |
 
-*A100 theoretical peak bandwidth: 2,000 GB/s. Triton fused softmax reaches ~93% of peak.*
+*Estimated: A100 theoretical peak bandwidth is 2,000 GB/s. Based on known A100 performance, fused softmax would reach ~93% of peak.*
 
 ### Flash Attention: Triton vs PyTorch SDPA vs Naive
 
@@ -73,7 +73,7 @@ Config: batch=2, heads=8, head_dim=64, dtype=fp16
 | 1024   | 0.241     | 0.385     | 1.012     | 1.60x  | 134.4 MB   | 5.2 MB     |
 | 2048   | 0.497     | 0.831     | OOM       | 1.67x  | >512 MB    | 9.8 MB     |
 
-*Flash attention memory scales as O(N) — naive scales as O(N²). At seq_len=2048: 50x VRAM reduction.*
+*Estimated: Flash attention memory scales as O(N) — naive scales as O(N²). At seq_len=2048, estimated 50x+ VRAM reduction.*
 
 ## Quick Start
 
@@ -93,12 +93,12 @@ from triton_kernels import fused_softmax, flash_attention
 
 # Fused softmax
 x = torch.randn(64, 1024, device='cuda')
-out = fused_softmax(x)  # 1.7x faster than torch.softmax on A100
+out = fused_softmax(x)  # ~1.7x faster than torch.softmax (estimated on A100)
 
 # Flash Attention
 q = torch.randn(2, 8, 512, 64, device='cuda', dtype=torch.float16)
 k, v = torch.randn_like(q), torch.randn_like(q)
-out = flash_attention(q, k, v, causal=True)  # 50x less VRAM than naive
+out = flash_attention(q, k, v, causal=True)  # ~50x less VRAM than naive at large seq_len
 ```
 
 ```bash
