@@ -83,7 +83,7 @@ Q, K, V tensors (batch × heads × seq_len × head_dim)
 **Why this is memory-efficient:**
 Naive attention materializes the full `(seq_len × seq_len)` attention matrix in DRAM. For seq_len=2048 with fp32, this is `2048^2 × 4 = 16 MB per head`. With 32 heads and batch=8, that's 4 GB just for attention weights.
 
-Flash attention's SRAM footprint is `O(BLOCK_M × BLOCK_DHEAD + BLOCK_N × BLOCK_DHEAD + BLOCK_M × BLOCK_N)` — constant with respect to seq_len.
+Flash attention's SRAM footprint is `O(BLOCK_M × BLOCK_DHEAD + BLOCK_N × BLOCK_DHEAD + BLOCK_M × BLOCK_N)` - constant with respect to seq_len.
 
 ## GPU Memory Hierarchy
 
