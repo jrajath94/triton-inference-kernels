@@ -1,6 +1,6 @@
 # triton-inference-kernels
 
-> GPU inference kernels written in OpenAI Triton — fused softmax and Flash Attention with operation fusion, memory coalescing, and benchmarks against PyTorch baseline.
+> GPU inference kernels written in OpenAI Triton - fused softmax and Flash Attention with operation fusion, memory coalescing, and benchmarks against PyTorch baseline.
 
 [![CI](https://github.com/jrajath94/triton-inference-kernels/actions/workflows/ci.yml/badge.svg)](https://github.com/jrajath94/triton-inference-kernels/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -9,29 +9,29 @@
 
 ## Why This Exists
 
-Most flash attention implementations are either black-box CUDA C++ (opaque, thousands of lines) or high-level PyTorch wrappers (no insight into the underlying optimization). This project implements flash attention and fused softmax directly in Triton — the same compiler stack OpenAI built for production LLM inference — with every tile, stride, and memory access decision fully visible and commented.
+Most flash attention implementations are either black-box CUDA C++ (opaque, thousands of lines) or high-level PyTorch wrappers (no insight into the underlying optimization). This project implements flash attention and fused softmax directly in Triton - the same compiler stack OpenAI built for production LLM inference - with every tile, stride, and memory access decision fully visible and commented.
 
 The goal: if you want to understand *why* flash attention uses 50x less memory than naive attention, and *how* a GPU kernel implements the online softmax algorithm that makes it possible, this codebase is the clearest path.
 
 ## Why Triton Over CUDA?
 
-CUDA gives maximum control but requires C++ and manual PTX. Triton provides Python-level ergonomics, exposing key abstractions — tiling, memory coalescing, blocked loads — without the full ISA. For inference engineering teams, this enables faster kernel iteration on non-standard architectures.
+CUDA gives maximum control but requires C++ and manual PTX. Triton provides Python-level ergonomics, exposing key abstractions - tiling, memory coalescing, blocked loads - without the full ISA. For inference engineering teams, this enables faster kernel iteration on non-standard architectures.
 
 ## Key Implementation Details
 
 ### Fused Softmax (`src/triton_kernels/softmax.py`)
 
-- **Single-pass algorithm** — reads input once (not twice like naive PyTorch)
-- **Memory coalescing** — each thread block handles a contiguous row; 128-byte aligned vectorized loads
-- **Numerically stable** — online max-subtraction prevents fp32 overflow for large logits
+- **Single-pass algorithm** - reads input once (not twice like naive PyTorch)
+- **Memory coalescing** - each thread block handles a contiguous row; 128-byte aligned vectorized loads
+- **Numerically stable** - online max-subtraction prevents fp32 overflow for large logits
 - **1.5–1.9x faster** than `torch.nn.functional.softmax` on A100 for large batches
 
 ### Flash Attention (`src/triton_kernels/attention.py`)
 
 - **O(seq_len) memory** instead of O(seq_len²) for naive attention
-- **SRAM-resident softmax** — QK^T matmul and AV matmul fused in one kernel, never writes intermediate attention matrix to DRAM
-- **Online softmax accumulation** — running `(max, denominator, output)` state updated per K,V tile
-- **Causal masking** — compile-time `IS_CAUSAL` constexpr avoids branch overhead for the common case
+- **SRAM-resident softmax** - QK^T matmul and AV matmul fused in one kernel, never writes intermediate attention matrix to DRAM
+- **Online softmax accumulation** - running `(max, denominator, output)` state updated per K,V tile
+- **Causal masking** - compile-time `IS_CAUSAL` constexpr avoids branch overhead for the common case
 
 ## Architecture
 
@@ -73,7 +73,7 @@ Config: batch=2, heads=8, head_dim=64, dtype=fp16
 | 1024   | 0.241     | 0.385     | 1.012     | 1.60x  | 134.4 MB   | 5.2 MB     |
 | 2048   | 0.497     | 0.831     | OOM       | 1.67x  | >512 MB    | 9.8 MB     |
 
-*Estimated: Flash attention memory scales as O(N) — naive scales as O(N²). At seq_len=2048, estimated 50x+ VRAM reduction.*
+*Estimated: Flash attention memory scales as O(N) - naive scales as O(N²). At seq_len=2048, estimated 50x+ VRAM reduction.*
 
 ## Quick Start
 
@@ -128,15 +128,15 @@ make lint    # Ruff + mypy
 
 ## Papers Implemented
 
-- **Flash Attention:** "FlashAttention: Fast and Memory-Efficient Exact Attention with IO-Awareness" (Dao, Fu, Ermon, Rudra, Re — NeurIPS 2022) [[arxiv](https://arxiv.org/abs/2205.14135)]
+- **Flash Attention:** "FlashAttention: Fast and Memory-Efficient Exact Attention with IO-Awareness" (Dao, Fu, Ermon, Rudra, Re - NeurIPS 2022) [[arxiv](https://arxiv.org/abs/2205.14135)]
 - **Online Normalization:** "Online normalizer calculation for softmax" (Milakov & Gimelshein, 2018) [[arxiv](https://arxiv.org/abs/1805.02867)]
-- **Triton:** "Triton: An Intermediate Language and Compiler for Tiled Neural Network Computations" (Tillet, Kung, Cox — MAPL 2019) [[link](https://www.eecs.harvard.edu/~htk/publication/2019-mapl-tillet-kung-cox.pdf)]
+- **Triton:** "Triton: An Intermediate Language and Compiler for Tiled Neural Network Computations" (Tillet, Kung, Cox - MAPL 2019) [[link](https://www.eecs.harvard.edu/~htk/publication/2019-mapl-tillet-kung-cox.pdf)]
 
 ## Related Projects
 
-- [`attention-kernel-cuda`](https://github.com/jrajath94/attention-kernel-cuda) — same Flash Attention in CUDA C++, demonstrating the lower-level implementation
-- [`gpu-memory-profiler`](https://github.com/jrajath94/gpu-memory-profiler) — visualize GPU memory usage for kernels like these
+- [`attention-kernel-cuda`](https://github.com/jrajath94/attention-kernel-cuda) - same Flash Attention in CUDA C++, demonstrating the lower-level implementation
+- [`gpu-memory-profiler`](https://github.com/jrajath94/gpu-memory-profiler) - visualize GPU memory usage for kernels like these
 
 ## License
 
-MIT — Rajath John
+MIT - Rajath John
